@@ -53,29 +53,45 @@ class Car:
         self.parked = False
         self.spot_index = -1
     
+    # Layout parkir 2 kolom 4 baris - made slightly smaller
+    parking_spots = [
+        # Kolom 1 (kiri)
+        (-0.65, 0.7, 0.4, 0.3),   # Baris 1
+        (-0.65, 0.35, 0.4, 0.3),   # Baris 2
+        (-0.65, 0.0, 0.4, 0.3),   # Baris 3
+        (-0.65, -0.35, 0.4, 0.3),  # Baris 4
+        
+        # Kolom 2 (kanan)
+        (0.25, 0.7, 0.4, 0.3),    # Baris 1
+        (0.25, 0.35, 0.4, 0.3),    # Baris 2
+        (0.25, 0.0, 0.4, 0.3),    # Baris 3
+        (0.25, -0.35, 0.4, 0.3),   # Baris 4
+    ]
+    
+    # In Car class, update the car size
     def draw(self):
         glPushMatrix()
         glTranslatef(self.x, self.y, 0)
         glRotatef(-self.angle, 0, 0, 1)
-
-        # Badan mobil (tampilan dari atas)
+    
+        # Badan mobil - made longer
         glBegin(GL_QUADS)
         glColor3f(*self.color)
-        glVertex2f(-0.08, 0.15)  # Depan kiri
-        glVertex2f(0.08, 0.15)   # Depan kanan
-        glVertex2f(0.08, -0.15)  # Belakang kanan
-        glVertex2f(-0.08, -0.15) # Belakang kiri
+        glVertex2f(-0.09, 0.17) 
+        glVertex2f(0.09, 0.17)   
+        glVertex2f(0.09, -0.17)  
+        glVertex2f(-0.09, -0.17) 
         glEnd()
-
-        # Kaca depan (tampilan dari atas)
+    
+        # Kaca depan - adjusted for longer body
         glBegin(GL_QUADS)
         glColor3f(0.7, 0.7, 0.7)
-        glVertex2f(-0.06, 0.05)
-        glVertex2f(0.06, 0.05)
-        glVertex2f(0.06, -0.05)
-        glVertex2f(-0.06, -0.05)
+        glVertex2f(-0.07, 0.08)  # Increased width from 0.06 to 0.07
+        glVertex2f(0.07, 0.08)
+        glVertex2f(0.07, -0.08)
+        glVertex2f(-0.07, -0.08)
         glEnd()
-
+    
         glPopMatrix()
     
     def update(self, keys, dt):
@@ -143,15 +159,38 @@ class Car:
     
     def get_corners(self):
         # Mendapatkan koordinat 4 sudut mobil berdasarkan posisi dan sudut
-        half_width = 0.08
-        half_height = 0.15
-        corners = [
-            (-half_width, half_height),  # Depan kiri
-            (half_width, half_height),   # Depan kanan
-            (half_width, -half_height),  # Belakang kanan
-            (-half_width, -half_height)  # Belakang kiri
+        half_width = 0.09
+        half_height = 0.18
+        
+        # Add more sensor points for better detection
+        side_sensor_points = [
+            (-half_width, half_height*0.9),    # Kiri depan atas
+            (-half_width, half_height*0.6),    # Kiri depan tengah
+            (-half_width, half_height*0.3),    # Kiri depan bawah
+            (-half_width, 0),                  # Kiri tengah
+            (-half_width, -half_height*0.3),   # Kiri belakang atas
+            (-half_width, -half_height*0.6),   # Kiri belakang tengah
+            (-half_width, -half_height*0.9),   # Kiri belakang bawah
+            
+            (half_width, half_height*0.9),     # Kanan depan atas
+            (half_width, half_height*0.6),     # Kanan depan tengah
+            (half_width, half_height*0.3),     # Kanan depan bawah
+            (half_width, 0),                   # Kanan tengah
+            (half_width, -half_height*0.3),    # Kanan belakang atas
+            (half_width, -half_height*0.6),    # Kanan belakang tengah
+            (half_width, -half_height*0.9),    # Kanan belakang bawah
+            
+            (0, half_height),                  # Tengah depan
+            (0, -half_height),                 # Tengah belakang
         ]
         
+        corners = [
+            (-half_width, half_height),    # Depan kiri
+            (half_width, half_height),     # Depan kanan
+            (half_width, -half_height),    # Belakang kanan
+            (-half_width, -half_height),   # Belakang kiri
+        ] + side_sensor_points
+
         # Transformasi sudut sesuai rotasi mobil
         rotated_corners = []
         for x, y in corners:
@@ -194,45 +233,48 @@ def check_parking_status(cars):
         car.parked = False
         car.spot_index = -1
         
-        # Dapatkan koordinat 4 sudut mobil
-        car_corners = car.get_corners()
+        # Dapatkan koordinat sudut mobil dan sensor
+        car_points = car.get_corners()
+        car_corners = car_points[:4]  # 4 sudut utama
         
         for spot_idx, (spot_x, spot_y, spot_width, spot_height) in enumerate(parking_spots):
-            # Cek apakah semua sudut mobil ada di dalam area parkir
             corners_inside = 0
-            any_corner_touching_border = False
+            any_point_touching_border = False
             
-            for corner_x, corner_y in car_corners:
-                # Periksa apakah sudut ada di dalam area parkir
-                if (spot_x < corner_x < spot_x + spot_width and 
-                    spot_y - spot_height < corner_y < spot_y):
-                    corners_inside += 1
+            # Check if any point is near or inside the spot
+            for point_x, point_y in car_points:
+                # Increased margin for better border detection
+                margin = 0.015  # Smaller margin for more precise detection
                 
-                # Cek apakah sudut menyentuh atau terlalu dekat dengan batas
-                border_margin = 0.015  # Margin untuk deteksi menyentuh border
-                if (((spot_x <= corner_x <= spot_x + border_margin) or 
-                     (spot_x + spot_width - border_margin <= corner_x <= spot_x + spot_width)) and
-                    spot_y - spot_height < corner_y < spot_y):
-                    any_corner_touching_border = True
-                
-                if (((spot_y - spot_height <= corner_y <= spot_y - spot_height + border_margin) or 
-                     (spot_y - border_margin <= corner_y <= spot_y)) and
-                    spot_x < corner_x < spot_x + spot_width):
-                    any_corner_touching_border = True
+                # First check if point is in the general area of the spot
+                if (spot_x - margin <= point_x <= spot_x + spot_width + margin and
+                    spot_y - spot_height - margin <= point_y <= spot_y + margin):
+                    
+                    # More precise border detection
+                    if (abs(point_x - spot_x) <= margin or  # Left border
+                        abs(point_x - (spot_x + spot_width)) <= margin or  # Right border
+                        abs(point_y - spot_y) <= margin or  # Top border
+                        abs(point_y - (spot_y - spot_height)) <= margin):  # Bottom border
+                        
+                        any_point_touching_border = True
+                        parking_statuses[spot_idx] = 2  # Touching lines
+                        occupied_spots.append(spot_idx)
+                        car.parked = True
+                        car.spot_index = spot_idx
+                        break
             
-            # Setel status parkir berdasarkan posisi mobil
-            if corners_inside == 4:  # Semua sudut di dalam
-                if any_corner_touching_border:
-                    parking_statuses[spot_idx] = 2  # Parkir menyentuh garis (oranye)
-                else:
-                    parking_statuses[spot_idx] = 1  # Parkir sempurna (hijau)
+            # Check for perfect parking only with main corners
+            if not any_point_touching_border:
+                corners_inside = sum(1 for x, y in car_corners 
+                                  if (spot_x + margin < x < spot_x + spot_width - margin and 
+                                      spot_y - spot_height + margin < y < spot_y - margin))
                 
-                occupied_spots.append(spot_idx)
-                car.parked = True
-                car.spot_index = spot_idx
-                
-                if parking_statuses[spot_idx] == 1:
-                    success_timer = 60  # Teks parkir berhasil
+                if corners_inside == 4:
+                    parking_statuses[spot_idx] = 1  # Perfect parking
+                    occupied_spots.append(spot_idx)
+                    car.parked = True
+                    car.spot_index = spot_idx
+                    success_timer = 60
 
 def draw_parking_lot():
     for i, (x, y, width, height) in enumerate(parking_spots):
@@ -242,9 +284,11 @@ def draw_parking_lot():
             if status == 1:  # Parkir sempurna
                 glColor3f(0.0, 0.6, 0.0)  # Hijau 
             elif status == 2:  # Parkir menyentuh garis
-                glColor3f(1.0, 0.0, 0.0)  # Merah
+                glColor3f(1.0, 0.8, 0.0)  # Kuning untuk menyentuh garis
+            else:
+                glColor3f(0.25, 0.25, 0.25)  # Abu-abu untuk slot kosong
         else:
-            glColor3f(1.0, 1.0, 0.0)  # Kuning untuk slot yang tersedia
+            glColor3f(0.25, 0.25, 0.25)  # Abu-abu untuk slot kosong
         
         # Gambar area parkir
         glBegin(GL_QUADS)
@@ -255,7 +299,7 @@ def draw_parking_lot():
         glEnd()
         
         # Garis pembatas parkir
-        glColor3f(1.0, 1.0, 1.0)  # Warna putih untuk garis
+        glColor3f(1.0, 1.0, 1.0)
         glLineWidth(2.0)
         glBegin(GL_LINE_LOOP)
         glVertex2f(x, y)
@@ -281,14 +325,27 @@ def draw_parking_lot():
 
 def draw_success_message():
     if success_timer > 0:
+        # Count perfectly parked cars
+        perfect_parks = sum(1 for status in parking_statuses if status == 1)
+        
         font = pygame.font.Font(None, 48)
-        success_text = font.render('Parkir Berhasil!', True, (0, 255, 0))
-        text_surface = pygame.Surface((300, 50), pygame.SRCALPHA)
-        text_surface.blit(success_text, (0, 0))
+        success_text = font.render(f'Parkir Berhasil! {perfect_parks}/2', True, (50, 50, 0))  # Dark yellow text
+        text_surface = pygame.Surface((400, 60), pygame.SRCALPHA)  # Increased width from 300 to 400
+        
+        # Lighter background
+        background = pygame.Surface((400, 60))  # Increased width to match surface
+        background.fill((255, 255, 150))  # Light yellow background
+        background.set_alpha(180)  # More opaque background
+        text_surface.blit(background, (0, 0))
+        
+        # Center the text on the wider surface
+        text_rect = success_text.get_rect(center=(200, 30))  # Adjusted center x from 150 to 200
+        text_surface.blit(success_text, text_rect)
         text_data = pygame.image.tostring(text_surface, "RGBA", True)
         
-        glWindowPos2f(250, 550)  # Posisi tengah atas layar
-        glDrawPixels(300, 50, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+        # Position in center top of screen, adjusted for wider surface
+        glWindowPos2f(200, 520)  # Adjusted x position from 250 to 200 to maintain center
+        glDrawPixels(400, 60, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
 
 def draw_scene(cars):
     global success_timer
