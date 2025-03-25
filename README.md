@@ -30,7 +30,7 @@ cd 2D-Parking-Simulation-OpenGL-PyGame-Multiplayer
 pip install -r requirements.txt
 
 # Run the game
-python main.py
+python Game.py
 ```
 
 ## Future Improvements 🚧
